@@ -1,9 +1,11 @@
 # PasteImage
 
-An Omarchy shell plugin that lets you paste clipboard images into terminal TUIs —
-the way pasting into a terminal works on macOS.
+An Omarchy shell plugin for pasting screenshots into **AI coding agents running
+in your terminal** — Claude Code and the like — the way it already works on macOS.
 
-Copy a screenshot, focus Claude Code, hit `SUPER+V`, get `[Image #1]`.
+Copy a screenshot, focus Claude Code, hit `SUPER+V`, get `[Image #1]`. Show the
+agent a broken layout, a stack trace, a design mockup, a chart that looks wrong,
+instead of describing it in words.
 
 ## The problem
 
@@ -29,6 +31,26 @@ through to the running program. Every other case keeps stock behaviour:
 | Terminal | image | `Ctrl+V` ← the fix |
 | Terminal | text | `Shift+Insert` (stock) |
 | Anything else | either | `Ctrl+V` (stock) |
+
+## Which agents this works with
+
+The plugin's job ends at delivering `Ctrl+V` to whatever is running in the
+terminal. The agent has to read the clipboard itself, and that is what decides
+whether an image actually lands:
+
+| Agent | Status |
+| --- | --- |
+| **Claude Code** | Verified. It shells out to `wl-paste --type image/png` on Linux and attaches the result as `[Image #1]`. |
+| Other terminal agents (`codex`, `opencode`, `crush`, `gemini`, `grok`, …) | Untested. Works if the agent reads clipboard images on `Ctrl+V`; if it does not, it receives a bare `0x16` and nothing pastes. |
+
+Nothing here is Claude-specific — any TUI that reads the clipboard on `Ctrl+V`
+benefits. Claude Code is simply the one this was built against and verified on.
+
+If your agent falls in the second row, the fallback is to paste a file *path*
+instead: clipboard images are already on disk at
+`~/.local/state/omarchy/clipboard-images/`, and most agents will read an image
+path handed to them as text. That is not wired up here — open an issue if you
+want it.
 
 ## Install
 
@@ -113,10 +135,9 @@ updated in place, so the copy goes stale silently.
 
 ## Caveats
 
-- **Only helps TUIs that read the clipboard themselves.** Claude Code does.
-  `codex`, `opencode`, `crush`, `gemini`, and `grok` mostly do not — they receive a
-  bare `0x16`, and in a plain shell that's readline's `quoted-insert`. Harmless, but
-  nothing pastes.
+- **Only helps programs that read the clipboard themselves** — see
+  [Which agents this works with](#which-agents-this-works-with). At a plain shell
+  prompt `Ctrl+V` is readline's `quoted-insert`: harmless, but nothing pastes.
 - The binding is applied at runtime, so it will not appear in your `bindings.lua`.
   `omarchy menu keybindings --print` still shows it.
 - Removing the plugin costs you one `SUPER+V` press, which is spent restoring the
