@@ -44,6 +44,13 @@ Item {
 
   Component.onCompleted: applyBinding()
 
+  // Disabling or removing the plugin destroys this component, but the binding
+  // lives in Hyprland's runtime state and would outlive it — still pointing at a
+  // plugin directory that no longer exists, leaving SUPER+V silently dead. Hand
+  // it back to the config. `config-only` skips the monitor reload, so nothing on
+  // screen flickers, and execDetached survives our own destruction.
+  Component.onDestruction: Quickshell.execDetached(["hyprctl", "reload", "config-only"])
+
   Process {
     id: bindProcess
     command: ["hyprctl", "eval", root.bindLua]

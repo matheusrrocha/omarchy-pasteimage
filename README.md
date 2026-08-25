@@ -49,10 +49,12 @@ omarchy-pasteimage check     # dependencies, focused window, clipboard contents
 
 ```bash
 omarchy plugin remove rocha.pasteimage
-hyprctl reload   # hands SUPER+V back to your Hyprland config
 ```
 
-The binding lives in Hyprland's runtime state, so it outlives the plugin until
+`SUPER+V` goes straight back to your Hyprland config — the service runs
+`hyprctl reload config-only` as it shuts down. That cleanup matters: the binding
+lives in Hyprland's runtime state, so without it the key would outlive the plugin
+while pointing at a directory that no longer exists, leaving `SUPER+V` dead until
 the next config reload.
 
 ## How it claims the binding
