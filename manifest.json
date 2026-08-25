@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "id": "rocha.pasteimage",
+  "name": "pasteimage",
+  "version": "0.1.0",
+  "author": "rocha",
+  "license": "MIT",
+  "description": "Paste clipboard images into terminal TUIs. Makes SUPER+V send Ctrl+V when a terminal is focused and the clipboard holds an image, so Claude Code and other TUIs can attach it.",
+  "kinds": [
+    "service"
+  ],
+  "entryPoints": {
+    "service": "Service.qml"
+  }
+}

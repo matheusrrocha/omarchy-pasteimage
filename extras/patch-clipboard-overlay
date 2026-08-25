@@ -1,0 +1,51 @@
+#!/bin/bash
+# Optional extra: make the clipboard history overlay (SUPER+CTRL+V) paste images
+# into terminals too.
+#
+# The built-in overlay hands image rows to omarchy-clipboard-paste-file, which
+# also sends Shift+Insert — the same dead end this plugin fixes for SUPER+V.
+# /usr/share/omarchy is package-owned, so this clones the built-in plugin and
+# repoints one call site in the copy.
+#
+# Idempotent. Re-run after `omarchy update`: clones live in ~/.config and are
+# never updated in place, so the copy goes stale silently.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PASTE_BIN="$(cd "$SCRIPT_DIR/.." && pwd)/bin/omarchy-pasteimage"
+PLUGIN_ID="${USER:-$(id -un)}.clipboard"
+PLUGIN_DIR="$HOME/.config/omarchy/plugins/$PLUGIN_ID"
+QML="$PLUGIN_DIR/Clipboard.qml"
+
+fail() { echo "patch-clipboard-overlay: $*" >&2; exit 1; }
+
+[[ -x $PASTE_BIN ]] || fail "cannot find $PASTE_BIN"
+command -v omarchy-plugin-clone >/dev/null || fail "omarchy-plugin-clone not found"
+
+if [[ ! -d $PLUGIN_DIR ]]; then
+  omarchy-plugin-clone omarchy.clipboard >/dev/null || fail "could not clone omarchy.clipboard"
+  echo "Cloned omarchy.clipboard to $PLUGIN_ID"
+fi
+[[ -f $QML ]] || fail "$QML not found"
+
+# Match both a fresh clone and an older patch that used the bare command name.
+if grep -qF "\"$PASTE_BIN\", \"paste-entry\"" "$QML"; then
+  echo "Already patched"
+elif grep -qE '\["(omarchy-pasteimage|[^"]*/omarchy-pasteimage)", "paste-entry", row\.mime, row\.path\]' "$QML"; then
+  sed -i -E \
+    "s|\\[\"(omarchy-pasteimage\|[^\"]*/omarchy-pasteimage)\", \"paste-entry\", row\\.mime, row\\.path\\]|[\"$PASTE_BIN\", \"paste-entry\", row.mime, row.path]|" \
+    "$QML" || fail "could not repoint the existing patch"
+  echo "Repointed the patch at $PASTE_BIN"
+elif grep -qF '"/bin/omarchy-clipboard-paste-file", row.mime, row.path' "$QML"; then
+  # Only the apply (Enter) path — the --copy-only variant stays as-is.
+  sed -i \
+    "s|\[root\.omarchyPath + \"/bin/omarchy-clipboard-paste-file\", row\.mime, row\.path\]|[\"$PASTE_BIN\", \"paste-entry\", row.mime, row.path]|" \
+    "$QML" || fail "could not patch $QML"
+  echo "Patched $QML"
+else
+  fail "could not find the paste call site in $QML — upstream may have changed"
+fi
+
+command -v omarchy-shell >/dev/null && omarchy-shell shell rescanPlugins >/dev/null 2>&1
+echo "Done. SUPER+CTRL+V, pick an image, press Enter."

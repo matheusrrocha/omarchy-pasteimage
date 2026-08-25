@@ -1,0 +1,34 @@
+#!/bin/bash
+# Optional: put the CLI on your PATH so `omarchy-pasteimage check` works from a
+# shell. The plugin itself does NOT need this — Service.qml binds the script by
+# absolute path.
+#
+# Idempotent. An existing real file at the destination is backed up to <name>.bak
+# once before being replaced.
+
+set -uo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SOURCE="$SCRIPT_DIR/bin/omarchy-pasteimage"
+DEST_DIR="$HOME/.local/bin"
+DEST="$DEST_DIR/omarchy-pasteimage"
+
+mkdir -p "$DEST_DIR" || { echo "Cannot create $DEST_DIR" >&2; exit 1; }
+
+if [[ -L $DEST ]]; then
+  if [[ "$(readlink -f "$DEST")" == "$(readlink -f "$SOURCE")" ]]; then
+    echo "Already linked: $DEST"
+    exit 0
+  fi
+  rm -f "$DEST"
+elif [[ -e $DEST ]]; then
+  [[ -e $DEST.bak ]] || mv "$DEST" "$DEST.bak"
+fi
+
+ln -s "$SOURCE" "$DEST" || { echo "Could not link $DEST" >&2; exit 1; }
+echo "Linked $DEST"
+
+case ":$PATH:" in
+  *":$DEST_DIR:"*) ;;
+  *) echo "Note: $DEST_DIR is not on your PATH." >&2 ;;
+esac

@@ -1,0 +1,22 @@
+#!/bin/bash
+# Remove the PATH symlink created by ./install. The plugin itself is removed with
+# `omarchy plugin remove rocha.pasteimage`.
+
+set -uo pipefail
+
+DEST="$HOME/.local/bin/omarchy-pasteimage"
+
+if [[ -L $DEST ]]; then
+  rm -f "$DEST"
+  echo "Removed $DEST"
+  [[ -e $DEST.bak ]] && echo "Note: $DEST.bak is still there."
+else
+  echo "No symlink at $DEST"
+fi
+
+cat <<'NOTE'
+
+If you also removed the plugin, run `hyprctl reload` to hand SUPER+V back to your
+Hyprland config — the binding lives in Hyprland's runtime state, so it survives
+until the next config reload.
+NOTE
