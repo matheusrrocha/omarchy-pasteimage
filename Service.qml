@@ -22,11 +22,26 @@ Item {
   readonly property string pluginDir: String(Qt.resolvedUrl("."))
     .replace(/^file:\/\//, "")
     .replace(/\/$/, "")
-  readonly property string pasteCommand: pluginDir + "/bin/omarchy-pasteimage paste"
+  readonly property string scriptPath: pluginDir + "/bin/omarchy-pasteimage"
 
   function luaString(value) {
     return '"' + String(value).replace(/\\/g, "\\\\").replace(/"/g, '\\"') + '"'
   }
+
+  function shellQuote(value) {
+    return "'" + String(value).replace(/'/g, "'\\''") + "'"
+  }
+
+  // The binding outlives the plugin. omarchy-shell never destroys a service
+  // component — Component.onDestruction does not fire on disable or remove — so
+  // there is no teardown hook to clean up from, and a bind pointing straight at
+  // the plugin directory would go dead the moment the plugin is removed. Guard
+  // the exec instead: if the script is gone, the first SUPER+V press reloads the
+  // config, which hands the key straight back to the user's own binding.
+  readonly property string pasteCommand:
+    "test -x " + shellQuote(scriptPath) +
+    " && exec " + shellQuote(scriptPath) + " paste" +
+    " || hyprctl reload config-only"
 
   // Hyprland's Lua parser refuses `hyprctl keyword` outright ("keyword can't work
   // with non-legacy parsers. Use eval."), so the bind is installed by evaluating
@@ -43,13 +58,6 @@ Item {
   }
 
   Component.onCompleted: applyBinding()
-
-  // Disabling or removing the plugin destroys this component, but the binding
-  // lives in Hyprland's runtime state and would outlive it — still pointing at a
-  // plugin directory that no longer exists, leaving SUPER+V silently dead. Hand
-  // it back to the config. `config-only` skips the monitor reload, so nothing on
-  // screen flickers, and execDetached survives our own destruction.
-  Component.onDestruction: Quickshell.execDetached(["hyprctl", "reload", "config-only"])
 
   Process {
     id: bindProcess

@@ -51,11 +51,10 @@ omarchy-pasteimage check     # dependencies, focused window, clipboard contents
 omarchy plugin remove rocha.pasteimage
 ```
 
-`SUPER+V` goes straight back to your Hyprland config — the service runs
-`hyprctl reload config-only` as it shuts down. That cleanup matters: the binding
-lives in Hyprland's runtime state, so without it the key would outlive the plugin
-while pointing at a directory that no longer exists, leaving `SUPER+V` dead until
-the next config reload.
+The first `SUPER+V` after that reloads your Hyprland config and hands the key
+back to your own binding; press it again and you get stock paste. Nothing else to
+run. See [Why the binding heals itself](#why-the-binding-heals-itself) for why
+that press is needed at all.
 
 ## How it claims the binding
 
@@ -74,6 +73,25 @@ alongside this one and both fire. A config reload re-registers the stock binding
 so the service listens for Hyprland's `configreloaded` event and claims it back
 ~250ms later. There is a brief window right after a reload where stock behaviour
 applies.
+
+### Why the binding heals itself
+
+Hyprland keybindings live in runtime state, so this one outlives the plugin. The
+obvious cleanup — restore the config when the service shuts down — is not
+available: `omarchy-shell` never destroys a service component, and
+`Component.onDestruction` does not fire on either `plugin disable` or
+`plugin remove`. A bind pointing straight at the plugin directory would therefore
+go dead the moment the plugin was removed.
+
+So the exec is guarded instead:
+
+```sh
+test -x <plugin>/bin/omarchy-pasteimage && exec <plugin>/bin/omarchy-pasteimage paste \
+  || hyprctl reload config-only
+```
+
+If the script is gone, the keypress reloads the config, which re-registers the
+user's own `SUPER+V`. The plugin cannot leave a dead key behind.
 
 Keystrokes are injected with Hyprland's `send_key_state` dispatcher rather than
 `wtype`: a physically-held SUPER merges into a wtype-injected chord at the seat,
@@ -101,6 +119,8 @@ updated in place, so the copy goes stale silently.
   nothing pastes.
 - The binding is applied at runtime, so it will not appear in your `bindings.lua`.
   `omarchy menu keybindings --print` still shows it.
+- Removing the plugin costs you one `SUPER+V` press, which is spent restoring the
+  stock binding.
 - Plugins run unsandboxed inside `omarchy-shell`. Read `Service.qml` before you
   enable it — it's about 60 lines.
 
