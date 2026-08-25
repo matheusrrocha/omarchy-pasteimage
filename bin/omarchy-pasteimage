@@ -15,6 +15,12 @@
 
 set -uo pipefail
 
+# Resolved so the keybinding points at the real file even when this script is
+# invoked through the ~/.local/bin symlink.
+SELF=$(readlink -f "${BASH_SOURCE[0]}")
+STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy"
+MARKER="$STATE_DIR/pasteimage-enabled"
+
 # Hyprland tags terminals in default/hypr/apps/terminals.lua. Dynamic tags carry
 # a trailing "*", hence the strip.
 is_terminal() {
@@ -64,6 +70,49 @@ cmd_paste_entry() {
   send_key CTRL V
 }
 
+shell_quote() { printf "'%s'" "${1//\'/\'\\\'\'}"; }
+lua_quote() { printf '"%s"' "$(printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g')"; }
+
+# Installs the keybinding into Hyprland's runtime state — but only once the user
+# has opted in with `enable`. Called by Service.qml at load and after every
+# config reload, so a plugin that is installed but not enabled stays completely
+# inert.
+#
+# Hyprland's Lua parser refuses `hyprctl keyword` ("keyword can't work with
+# non-legacy parsers. Use eval."), so the bind goes in through `hyprctl eval`.
+# The unbind matters: without it the config's own SUPER+V stays registered
+# alongside this one and both fire.
+#
+# The exec is guarded because the binding outlives the plugin — omarchy-shell
+# never destroys a service component, so there is no teardown hook. If the
+# script is gone, the keypress reloads the config and hands SUPER+V straight
+# back to the user's own binding instead of dying.
+cmd_apply_binding() {
+  [[ -e $MARKER ]] || return 0
+
+  local exec_cmd lua
+  exec_cmd="test -x $(shell_quote "$SELF") && exec $(shell_quote "$SELF") paste || hyprctl reload config-only"
+  lua="hl.unbind(\"SUPER + V\") hl.bind(\"SUPER + V\", hl.dsp.exec_cmd($(lua_quote "$exec_cmd")), { description = \"Universal paste\" })"
+
+  hyprctl eval "$lua" >/dev/null
+}
+
+cmd_enable() {
+  mkdir -p "$STATE_DIR" || { echo "omarchy-pasteimage: cannot create $STATE_DIR" >&2; return 1; }
+  touch "$MARKER" || return 1
+  cmd_apply_binding
+  echo "SUPER+V now pastes clipboard images into terminal TUIs."
+  echo "Undo with: omarchy-pasteimage disable"
+}
+
+cmd_disable() {
+  rm -f "$MARKER"
+  # Hands SUPER+V back to the user's own config. config-only skips the monitor
+  # reload, so nothing on screen flickers.
+  hyprctl reload config-only >/dev/null 2>&1
+  echo "SUPER+V returned to your Hyprland config."
+}
+
 cmd_check() {
   local missing=0 dep
   for dep in hyprctl jq wl-paste wl-copy; do
@@ -76,6 +125,12 @@ cmd_check() {
   done
 
   echo
+  if [[ -e $MARKER ]]; then
+    echo "  opted in: yes ($MARKER)"
+  else
+    echo "  opted in: NO — run 'omarchy-pasteimage enable' to claim SUPER+V"
+  fi
+
   if is_terminal; then
     echo "  focused window: terminal (would use Ctrl+V for images)"
   else
@@ -98,14 +153,23 @@ usage() {
   cat <<'USAGE'
 Usage: omarchy-pasteimage <command>
 
-  paste                          Image-aware universal paste. Bind to SUPER+V.
+  enable                         Claim SUPER+V for image-aware paste. Opt-in;
+                                 the plugin does nothing until you run this.
+  disable                        Hand SUPER+V back to your Hyprland config.
+  check                          Report opt-in state, dependencies, and what
+                                 paste would do right now.
+  paste                          Image-aware universal paste. Bound to SUPER+V.
   paste-entry <mime> <path>      Copy a file to the clipboard and paste it.
                                  Used by the cloned clipboard overlay.
-  check                          Report dependencies and what paste would do now.
+  apply-binding                  Re-assert the binding if opted in. Called by
+                                 the plugin service; not usually run by hand.
 USAGE
 }
 
 case "${1:-}" in
+enable) shift; cmd_enable "$@" ;;
+disable) shift; cmd_disable "$@" ;;
+apply-binding) shift; cmd_apply_binding "$@" ;;
 paste) shift; cmd_paste "$@" ;;
 paste-entry) shift; cmd_paste_entry "$@" ;;
 check) shift; cmd_check "$@" ;;

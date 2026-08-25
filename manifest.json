@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "rocha.pasteimage",
   "name": "PasteImage",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "author": "rocha",
   "license": "MIT",
   "description": "Paste screenshots into AI coding agents running in your terminal. Makes SUPER+V send Ctrl+V when a terminal is focused and the clipboard holds an image, so Claude Code and other TUIs can attach it.",

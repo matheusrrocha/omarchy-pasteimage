@@ -56,33 +56,40 @@ want it.
 
 ```bash
 omarchy plugin add https://github.com/matheusrrocha/omarchy-pasteimage.git --enable
+~/.config/omarchy/plugins/rocha.pasteimage/install && omarchy-pasteimage enable
 ```
 
-That's all — the service claims `SUPER+V` when it loads. Nothing to edit.
-
-Optionally put the CLI on your PATH:
+The second line is the opt-in. **Claiming `SUPER+V` is deliberate, never
+automatic** — installing and enabling the plugin does nothing on its own, because
+`SUPER+V` is a key your own Hyprland config defines and this should not take it
+without you asking. `install` puts the CLI on your PATH; `enable` claims the key.
 
 ```bash
-~/.config/omarchy/plugins/rocha.pasteimage/install
-omarchy-pasteimage check     # dependencies, focused window, clipboard contents
+omarchy-pasteimage check      # opt-in state, dependencies, what paste would do now
+omarchy-pasteimage disable    # hand SUPER+V back to your config, keep the plugin
 ```
+
+Nothing under `~/.config` is written at any point. The binding is installed into
+Hyprland's *runtime* state, so your config always wins on the next reload — the
+service simply re-claims the key afterwards while you are opted in.
 
 ### Removing it
 
 ```bash
+omarchy-pasteimage disable
 omarchy plugin remove rocha.pasteimage
 ```
 
-The first `SUPER+V` after that reloads your Hyprland config and hands the key
-back to your own binding; press it again and you get stock paste. Nothing else to
-run. See [Why the binding heals itself](#why-the-binding-heals-itself) for why
-that press is needed at all.
+`disable` alone is enough to get `SUPER+V` back. If you remove the plugin without
+disabling first, the next `SUPER+V` press restores your binding by itself — see
+[Why the binding heals itself](#why-the-binding-heals-itself).
 
 ## How it claims the binding
 
-Omarchy 4 configures Hyprland in Lua, and Hyprland's Lua parser refuses
-`hyprctl keyword` outright — *"keyword can't work with non-legacy parsers. Use
-eval."* So `Service.qml` evaluates Lua in the config state instead:
+Once you have opted in with `enable`, Omarchy 4 configures Hyprland in Lua, and
+Hyprland's Lua parser refuses `hyprctl keyword` outright — *"keyword can't work
+with non-legacy parsers. Use eval."* So the binding goes in through
+`hyprctl eval`, which evaluates Lua in the config state:
 
 ```lua
 hl.unbind("SUPER + V")
@@ -140,6 +147,8 @@ updated in place, so the copy goes stale silently.
   prompt `Ctrl+V` is readline's `quoted-insert`: harmless, but nothing pastes.
 - The binding is applied at runtime, so it will not appear in your `bindings.lua`.
   `omarchy menu keybindings --print` still shows it.
+- Until you run `enable`, the plugin is inert — it binds nothing and changes no
+  behaviour, even when installed and enabled in the shell.
 - Removing the plugin costs you one `SUPER+V` press, which is spent restoring the
   stock binding.
 - Plugins run unsandboxed inside `omarchy-shell`. Read `Service.qml` before you
