@@ -149,6 +149,9 @@ updated in place, so the copy goes stale silently.
   `omarchy menu keybindings --print` still shows it.
 - Until you run `enable`, the plugin is inert — it binds nothing and changes no
   behaviour, even when installed and enabled in the shell.
+- After `omarchy plugin update`, run `omarchy restart shell`. `omarchy-shell` does
+  not destroy a service component when its files change, so the previous instance
+  keeps running alongside the new one until the shell restarts.
 - Removing the plugin costs you one `SUPER+V` press, which is spent restoring the
   stock binding.
 - Plugins run unsandboxed inside `omarchy-shell`. Read `Service.qml` before you
