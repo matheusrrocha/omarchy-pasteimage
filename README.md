@@ -1,4 +1,4 @@
-# pasteimage
+# PasteImage
 
 An Omarchy shell plugin that lets you paste clipboard images into terminal TUIs —
 the way pasting into a terminal works on macOS.
